@@ -22,7 +22,7 @@ const { JSDOM } = jsdom;
 
 // Application-wide variables
 let account;
-var librus_access_token;
+let librus_access_token;
 const client_id = 'wmSyUMo8llDAs4y9tJVYY92oyZ6h4lAt7KCuy0Gv';
 const code_url = `https://portal.librus.pl/oauth2/authorize?client_id=${client_id}&redirect_uri=http://localhost/bar&response_type=code`;
 const login_url = 'https://portal.librus.pl/rodzina/login/action';
@@ -50,8 +50,6 @@ class SynergiaAccount {
         this.login = login;
         this.full_name = fullName;
     }
-
-
 }
 
 // This function is responsible for authorizing the user
