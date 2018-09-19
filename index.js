@@ -69,8 +69,9 @@ async function login(email, password) {
             csrf_token = document.window.document.querySelector("meta[name='csrf-token']").getAttribute('content');
             if (csrf_token === null) {
                 console.error('> nie znaleziono kodu csrf');
+                return;
             } else {
-                console.log(`> odnaleziony kod csrf: ${csrf_token}`);
+                //console.log(`> odnaleziony kod csrf: ${csrf_token}`);
             }
         });
 
@@ -94,7 +95,7 @@ async function login(email, password) {
             console.error(`> problem z logowaniem: ${res.status} ${res.statusText}\n> Sprawdz czy wpisane dane sa poprawne i sprobuj ponownie`);
             return;
         }
-        console.log(`> ${res.status} ${res.statusText}`)
+        //console.log(`> ${res.status} ${res.statusText}`)
     });
 
     // Get auth code by re-visiting the code URL
@@ -106,7 +107,7 @@ async function login(email, password) {
     }).then(res => {
         // Get redirect header value and save the authorization code
         code = res.headers.get('location').split('code=')[1];
-        console.log(`> uzyskany kod autoryzacji: ${code}`);
+        //console.log(`> uzyskany kod autoryzacji: ${code}`);
     });
 
     // Prepare JSON payload
@@ -128,11 +129,12 @@ async function login(email, password) {
     }).then(res => {
         if(res.status != '200') {
             console.log(`> wymiana zakonczona niepowodzeniem: ${res.status} ${res.statusText}`);
+            return;
         }
         return res.json();
     }).then(json => {
         librus_access_token = json['access_token'];
-        console.log(`> otrzymany token konta Librus: ${librus_access_token}`);
+        //console.log(`> otrzymany token konta Librus: ${librus_access_token}`);
     });
 
     // Get list of Synergia accounts tied to provided Librus account
