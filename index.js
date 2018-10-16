@@ -11,7 +11,7 @@
 // https://github.com/sindresorhus/ky
 const nodeFetch = require('node-fetch');
 // Fetch-Cookie wraps around Node-Fetch and allows for cookie storage (required throughout the authorization process)
-const fetch = require('fetch-cookie/node-fetch')(nodeFetch)
+const fetch = require('fetch-cookie/node-fetch')(nodeFetch);
 // Readline-sync becuase the built-in readline is weird, this module allows for normal input without hassle
 const readline = require('readline-sync');
 // Import project's package.json for version numbers etc.
@@ -19,6 +19,10 @@ const package_json = require('./package.json');
 // JSDOM for web scraping, basically. It's currently only being used for extracting the CSRF token.
 const jsdom = require('jsdom');
 const { JSDOM } = jsdom;
+// Minimist for argument parsing. This line automatically parses supplied options.
+var args = require('minimist')(process.argv.slice(2));
+// Utils file with helper functions
+const utils = require('./utils.js');
 
 // Application-wide variables
 let account;
@@ -28,17 +32,22 @@ const code_url = `https://portal.librus.pl/oauth2/authorize?client_id=${client_i
 const login_url = 'https://portal.librus.pl/rodzina/login/action';
 const code_exchange_url = 'https://portal.librus.pl/oauth2/access_token';
 const token_exchange_url = 'https://portal.librus.pl/api/SynergiaAccounts';
+const api_url = 'https://api.librus.pl/2.0/';
 
  
 // Application entry-point
 async function main() {
     console.log(`Librus ${package_json.version}`);
-    var email = readline.question('Email: ');
-    var password = readline.question('Haslo: ', {
-        hideEchoBack: true
-    });
+    if(args.username != undefined && args.password != undefined) {
+        await login(args.username, args.password);
+    } else {
+        var email = readline.question('Email: ');
+        var password = readline.question('Haslo: ', {
+            hideEchoBack: true
+        });
 
-    await login(email, password)
+        await login(email, password)
+    }
 }
 
 class SynergiaAccount {
@@ -50,6 +59,54 @@ class SynergiaAccount {
         this.login = login;
         this.full_name = fullName;
     }
+}
+
+async function getLessons(account) {
+    console.log("> pobieranie danych lekcji");
+    await fetch(`${api_url}Lessons`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${account.access_token}`
+        }
+    }).catch(err => console.error(err)).then(res => {
+        return res.text();
+    }).then(body => {
+        
+    })
+}
+
+async function getTimetable(account) {
+    console.log("> pobieranie planu lekcji");
+    await fetch(`${api_url}Timetables?weekStart=${utils.getWeekStart()}`, {
+        method: 'GET',
+        headers: {
+            'Authorization': `Bearer ${account.access_token}`
+        }
+    }).catch(err => console.error(err)).then(res => {
+        return res.text();
+    }).then(body => {
+        console.log(body);
+        var timetable = JSON.parse(body).Timetable;
+        for(var i = 0; i < timetable.length; i++) {
+            var schoolDay = timetable[i];
+        }
+    });
+}
+
+async function getRoot(account) {
+    console.log("> pobieranie listy endpointow API");
+    await fetch(`${api_url}Root`, {
+        headers: {
+            'Authorization': `Bearer ${account.access_token}`
+        }
+    })
+        .catch(err => console.error(err))
+        .then(res => {
+            return res.text();
+        })
+        .then(body => {
+            //console.log(body);
+        })
 }
 
 // This function is responsible for authorizing the user
@@ -69,7 +126,6 @@ async function login(email, password) {
             csrf_token = document.window.document.querySelector("meta[name='csrf-token']").getAttribute('content');
             if (csrf_token === null) {
                 console.error('> nie znaleziono kodu csrf');
-                return;
             } else {
                 //console.log(`> odnaleziony kod csrf: ${csrf_token}`);
             }
@@ -95,7 +151,7 @@ async function login(email, password) {
             console.error(`> problem z logowaniem: ${res.status} ${res.statusText}\n> Sprawdz czy wpisane dane sa poprawne i sprobuj ponownie`);
             return;
         }
-        //console.log(`> ${res.status} ${res.statusText}`)
+        console.log(`> ${res.status} ${res.statusText}`)
     });
 
     // Get auth code by re-visiting the code URL
@@ -129,7 +185,6 @@ async function login(email, password) {
     }).then(res => {
         if(res.status != '200') {
             console.log(`> wymiana zakonczona niepowodzeniem: ${res.status} ${res.statusText}`);
-            return;
         }
         return res.json();
     }).then(json => {
@@ -170,21 +225,29 @@ async function login(email, password) {
         }
         return res;
     }).then(accounts => {
-        // Present all detected accounts to the user and let them save selected ones
-        console.log('\n\n\nPonizej znajduje sie lista wykrytych kont Synergia.');
-        console.log('Aby wybrac konto wpisz jego login i zatwierdz wciskajac [enter].');
-        for(var i = 0; i < accounts.length; i++) {
-            console.log(`> ${accounts[i].full_name} (${accounts[i].group}) | ${accounts[i].login}`);
-        }
-        var selection = readline.question('Wybor: ');
-        for(var i = 0; i < accounts.length; i++) {
-            if(accounts[i].login === selection) {
-                account = accounts[i];
-                console.log(`Wybrano konto ${account.login}`);
-                return;
+        if(args.auto != undefined) {
+            console.log('> automatyczne wybieranie konta...');
+            console.log(`> wybrano ${accounts[0].login}`);
+            account = accounts[0];
+        } else {
+            // Present all detected accounts to the user and let them save selected ones
+            console.log('\n\n\nPonizej znajduje sie lista wykrytych kont Synergia.');
+            console.log('Aby wybrac konto wpisz jego login i zatwierdz wciskajac [enter].');
+            for(var i = 0; i < accounts.length; i++) {
+                console.log(`> ${accounts[i].full_name} (${accounts[i].group}) | ${accounts[i].login}`);
+            }
+            var selection = readline.question('Wybor: ');
+            for(var i = 0; i < accounts.length; i++) {
+                if(accounts[i].login === selection) {
+                    account = accounts[i];
+                    console.log(`Wybrano konto ${account.login}`);
+                }
             }
         }
-    })
+    });
+
+    await getRoot(account);
+    await getTimetable(account);
 }
 
 // Start app from entry-point
